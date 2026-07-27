@@ -1,5 +1,11 @@
 import { supabase } from './supabase';
-import type { Subject, Note, Lecture, Flashcard, Quiz, Question, QuizAttempt, ProgressSummary, ExamCategory } from './types';
+import type { Subject, Note, Lecture, Flashcard, Quiz, Question, QuizAttempt, ProgressSummary, ExamCategory, LeaderboardRow } from './types';
+
+export async function getLeaderboard(): Promise<LeaderboardRow[]> {
+  const { data, error } = await supabase.rpc('leaderboard');
+  if (error) throw error;
+  return data as LeaderboardRow[];
+}
 
 export async function listExamCategories(): Promise<ExamCategory[]> {
   const { data, error } = await supabase.from('exam_categories').select('*').order('order_index', { ascending: true });

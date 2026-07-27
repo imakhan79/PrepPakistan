@@ -1,11 +1,11 @@
 import { ReactNode, useState } from 'react';
 import {
-  LayoutDashboard, BookOpen, Users, TrendingUp, LogOut, Menu, X, GraduationCap,
+  LayoutDashboard, BookOpen, Users, TrendingUp, Trophy, LogOut, Menu, X, GraduationCap,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import type { Role } from '../lib/types';
 
-export type View = 'dashboard' | 'subjects' | 'progress' | 'users';
+export type View = 'dashboard' | 'subjects' | 'progress' | 'leaderboard' | 'users';
 
 interface NavItem {
   key: View;
@@ -18,6 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" />, roles: ['admin', 'student'] },
   { key: 'subjects', label: 'Subjects', icon: <BookOpen className="h-5 w-5" />, roles: ['admin', 'student'] },
   { key: 'progress', label: 'Progress', icon: <TrendingUp className="h-5 w-5" />, roles: ['student'] },
+  { key: 'leaderboard', label: 'Leaderboard', icon: <Trophy className="h-5 w-5" />, roles: ['admin', 'student'] },
   { key: 'users', label: 'Users', icon: <Users className="h-5 w-5" />, roles: ['admin'] },
 ];
 

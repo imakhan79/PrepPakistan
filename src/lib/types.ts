@@ -93,6 +93,15 @@ export interface QuizAttempt {
   completed_at: string | null;
 }
 
+export interface LeaderboardRow {
+  student_id: string;
+  full_name: string;
+  avatar_url: string | null;
+  total_score: number;
+  total_attempts: number;
+  avg_pct: number;
+}
+
 export interface ProgressSummary {
   subject_id: string;
   subject_title: string;

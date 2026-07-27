@@ -5,6 +5,7 @@ import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
 import SubjectsPage from './pages/SubjectsPage';
 import ProgressPage from './pages/ProgressPage';
+import LeaderboardPage from './pages/LeaderboardPage';
 import UsersPage from './pages/UsersPage';
 import Shell, { View } from './components/Shell';
 import { Spinner } from './components/ui';
@@ -31,6 +32,7 @@ function AppInner() {
       {active === 'dashboard' && <DashboardPage onNavigate={setActive} />}
       {active === 'subjects' && <SubjectsPage />}
       {active === 'progress' && <ProgressPage />}
+      {active === 'leaderboard' && <LeaderboardPage />}
       {active === 'users' && <UsersPage />}
     </Shell>
   );
