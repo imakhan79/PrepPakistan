@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap } from 'lucide-react';
+import { GraduationCap, Sparkles } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { Button, Input } from '../components/ui';
 import type { Role } from '../lib/types';
@@ -9,6 +9,14 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: 'parent', label: 'Parent' },
   { value: 'teacher', label: 'Teacher' },
   { value: 'institute_admin', label: 'Institute' },
+];
+
+const DEMO_PASSWORD = 'Demo1234!';
+const DEMO_ACCOUNTS: { role: Role; label: string; email: string; fullName: string; instituteName?: string }[] = [
+  { role: 'student', label: 'Student', email: 'student@demo.test', fullName: 'Demo Student' },
+  { role: 'parent', label: 'Parent', email: 'parent@demo.test', fullName: 'Demo Parent' },
+  { role: 'teacher', label: 'Teacher', email: 'teacher@demo.test', fullName: 'Demo Teacher' },
+  { role: 'institute_admin', label: 'Institute', email: 'institute@demo.test', fullName: 'Demo Institute Admin', instituteName: 'Demo Academy' },
 ];
 
 export default function AuthPage({ onBack }: { onBack?: () => void }) {
@@ -21,6 +29,7 @@ export default function AuthPage({ onBack }: { onBack?: () => void }) {
   const [instituteName, setInstituteName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState<Role | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,6 +37,17 @@ export default function AuthPage({ onBack }: { onBack?: () => void }) {
     setLoading(true);
     const result = mode === 'signin' ? await signIn(email, password) : await signUp(email, password, fullName, role, instituteName);
     setLoading(false);
+    if (result.error) setError(result.error);
+  }
+
+  async function handleDemoLogin(account: (typeof DEMO_ACCOUNTS)[number]) {
+    setError(null);
+    setDemoLoading(account.role);
+    let result = await signIn(account.email, DEMO_PASSWORD);
+    if (result.error) {
+      result = await signUp(account.email, DEMO_PASSWORD, account.fullName, account.role, account.instituteName);
+    }
+    setDemoLoading(null);
     if (result.error) setError(result.error);
   }
 
@@ -109,6 +129,27 @@ export default function AuthPage({ onBack }: { onBack?: () => void }) {
               {mode === 'signin' ? 'Sign up' : 'Sign in'}
             </button>
           </p>
+
+          <div className="mt-6 border-t border-slate-100 pt-5">
+            <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <Sparkles className="h-3.5 w-3.5" /> Try a demo account
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {DEMO_ACCOUNTS.map((account) => (
+                <Button
+                  key={account.role}
+                  type="button"
+                  variant="secondary"
+                  loading={demoLoading === account.role}
+                  disabled={demoLoading !== null}
+                  onClick={() => handleDemoLogin(account)}
+                  className="text-sm"
+                >
+                  {account.label}
+                </Button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
