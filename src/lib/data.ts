@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Subject, Note, Lecture, Flashcard, Quiz, Question, QuizAttempt, ProgressSummary, ExamCategory, LeaderboardRow, Institute, Profile, ChildRequest, IncomingLinkRequest } from './types';
+import type { Subject, Note, Lecture, Flashcard, Quiz, Question, QuizAttempt, ProgressSummary, ExamCategory, LeaderboardRow, Institute, Profile, ChildRequest, IncomingLinkRequest, StudentAnswer } from './types';
 
 export async function getLeaderboard(): Promise<LeaderboardRow[]> {
   const { data, error } = await supabase.rpc('leaderboard');
@@ -218,7 +218,7 @@ export async function listQuizzes(subjectId: string): Promise<Quiz[]> {
   return data as Quiz[];
 }
 
-export async function createQuiz(input: { subject_id: string; title: string; type: 'quiz' | 'mock_exam'; duration_minutes: number; created_by: string }) {
+export async function createQuiz(input: { subject_id: string; title: string; type: 'quiz' | 'mock_exam'; format: string; duration_minutes: number; created_by: string }) {
   const { data, error } = await supabase.from('quizzes').insert(input).select().single();
   if (error) throw error;
   return data as Quiz;
@@ -235,8 +235,35 @@ export async function listQuestions(quizId: string): Promise<Question[]> {
   return data as Question[];
 }
 
-export async function createQuestion(input: { quiz_id: string; prompt: string; options: string[]; correct_index: number; explanation: string; order_index: number }) {
+export interface QuestionInput {
+  quiz_id: string;
+  prompt: string;
+  options: string[];
+  correct_index: number;
+  correct_indices?: number[] | null;
+  correct_text?: string | null;
+  explanation: string;
+  order_index: number;
+  question_type?: string;
+  difficulty?: string;
+  bloom_level?: string | null;
+  topic?: string | null;
+  chapter?: string | null;
+  tags?: string[];
+  marks?: number;
+  negative_marking?: number;
+  image_url?: string | null;
+  reference?: string | null;
+  previous_exam_year?: string | null;
+}
+
+export async function createQuestion(input: QuestionInput) {
   const { error } = await supabase.from('questions').insert(input);
+  if (error) throw error;
+}
+
+export async function bulkCreateQuestions(rows: QuestionInput[]) {
+  const { error } = await supabase.from('questions').insert(rows);
   if (error) throw error;
 }
 
@@ -245,7 +272,7 @@ export async function deleteQuestion(id: string) {
   if (error) throw error;
 }
 
-export async function submitQuizAttempt(input: { quiz_id: string; student_id: string; score: number; total: number; answers: number[] }) {
+export async function submitQuizAttempt(input: { quiz_id: string; student_id: string; score: number; total: number; answers: StudentAnswer[] }) {
   const { data, error } = await supabase
     .from('quiz_attempts')
     .insert({ ...input, completed_at: new Date().toISOString() })

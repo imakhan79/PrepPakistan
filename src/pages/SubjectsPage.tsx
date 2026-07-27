@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, ArrowLeft, BookOpen, Video, Layers, ClipboardList, X, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, BookOpen, Video, Layers, ClipboardList, X } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import {
   listSubjects, createSubject, deleteSubject, listExamCategories,
@@ -7,12 +7,12 @@ import {
   listLectures, createLecture, deleteLecture,
   listFlashcards, createFlashcard, deleteFlashcard,
   listQuizzes, createQuiz, deleteQuiz,
-  listQuestions, createQuestion, deleteQuestion,
-  submitQuizAttempt,
 } from '../lib/data';
 import { Button, Card, Input, Textarea, Badge, EmptyState, Spinner, PageHeader } from '../components/ui';
-import type { Subject, Note, Lecture, Flashcard, Quiz, Question, ExamCategory } from '../lib/types';
-import { isStaffRole } from '../lib/types';
+import type { Subject, Note, Lecture, Flashcard, Quiz, ExamCategory, QuizFormat } from '../lib/types';
+import { isStaffRole, QUIZ_FORMAT_LABELS } from '../lib/types';
+import QuestionEditor from './quiz/QuestionEditor';
+import QuizRunner from './quiz/QuizRunner';
 
 const ICONS = ['📘', '🧮', '🧪', '🌍', '💻', '📖', '🔬', '📐'];
 const COLORS = ['#18b077', '#6a47f8', '#f59e0b', '#ef4444', '#0ea5e9', '#ec4899'];
@@ -434,6 +434,8 @@ function FlashcardsTab({ subject }: { subject: Subject }) {
   );
 }
 
+const QUIZ_FORMATS = Object.keys(QUIZ_FORMAT_LABELS) as QuizFormat[];
+
 function QuizzesTab({ subject }: { subject: Subject }) {
   const { profile } = useAuth();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -441,6 +443,7 @@ function QuizzesTab({ subject }: { subject: Subject }) {
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
   const [type, setType] = useState<'quiz' | 'mock_exam'>('quiz');
+  const [format, setFormat] = useState<QuizFormat>('quiz');
   const [duration, setDuration] = useState('15');
   const [editing, setEditing] = useState<Quiz | null>(null);
   const [taking, setTaking] = useState<Quiz | null>(null);
@@ -453,8 +456,8 @@ function QuizzesTab({ subject }: { subject: Subject }) {
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!profile) return;
-    await createQuiz({ subject_id: subject.id, title, type, duration_minutes: Number(duration), created_by: profile.id });
-    setTitle(''); setDuration('15'); setShowForm(false);
+    await createQuiz({ subject_id: subject.id, title, type, format, duration_minutes: Number(duration), created_by: profile.id });
+    setTitle(''); setDuration('15'); setFormat('quiz'); setShowForm(false);
     refresh();
   }
 
@@ -474,10 +477,13 @@ function QuizzesTab({ subject }: { subject: Subject }) {
           ) : (
             <form onSubmit={handleAdd} className="space-y-3">
               <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Quiz title" required />
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <select value={type} onChange={(e) => setType(e.target.value as any)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
                   <option value="quiz">Quiz</option>
                   <option value="mock_exam">Mock exam</option>
+                </select>
+                <select value={format} onChange={(e) => setFormat(e.target.value as QuizFormat)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+                  {QUIZ_FORMATS.map((f) => <option key={f} value={f}>{QUIZ_FORMAT_LABELS[f]}</option>)}
                 </select>
                 <Input value={duration} onChange={(e) => setDuration(e.target.value)} type="number" placeholder="Duration (min)" className="w-40" />
               </div>
@@ -497,7 +503,10 @@ function QuizzesTab({ subject }: { subject: Subject }) {
             <Card key={q.id} className="p-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <Badge tone={q.type === 'mock_exam' ? 'accent' : 'brand'}>{q.type === 'mock_exam' ? 'Mock exam' : 'Quiz'}</Badge>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge tone={q.type === 'mock_exam' ? 'accent' : 'brand'}>{q.type === 'mock_exam' ? 'Mock exam' : 'Quiz'}</Badge>
+                    <Badge tone="slate">{QUIZ_FORMAT_LABELS[q.format]}</Badge>
+                  </div>
                   <h3 className="mt-2 font-bold text-slate-900">{q.title}</h3>
                   <p className="mt-1 text-sm text-slate-500">{q.duration_minutes} minutes</p>
                 </div>
@@ -520,158 +529,3 @@ function QuizzesTab({ subject }: { subject: Subject }) {
   );
 }
 
-function QuestionEditor({ quiz, onBack }: { quiz: Quiz; onBack: () => void }) {
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [prompt, setPrompt] = useState('');
-  const [options, setOptions] = useState(['', '', '', '']);
-  const [correctIndex, setCorrectIndex] = useState(0);
-  const [explanation, setExplanation] = useState('');
-
-  async function refresh() {
-    setQuestions(await listQuestions(quiz.id));
-  }
-  useEffect(() => { refresh().finally(() => setLoading(false)); }, [quiz.id]);
-
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    await createQuestion({ quiz_id: quiz.id, prompt, options, correct_index: correctIndex, explanation, order_index: questions.length });
-    setPrompt(''); setOptions(['', '', '', '']); setCorrectIndex(0); setExplanation('');
-    refresh();
-  }
-
-  return (
-    <div>
-      <button onClick={onBack} className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-700">
-        <ArrowLeft className="h-4 w-4" /> Back to quizzes
-      </button>
-      <h2 className="mb-4 text-lg font-bold text-slate-900">{quiz.title} — Questions</h2>
-
-      <Card className="mb-6 p-5">
-        <form onSubmit={handleAdd} className="space-y-3">
-          <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={2} placeholder="Question prompt" required />
-          {options.map((o, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input type="radio" checked={correctIndex === i} onChange={() => setCorrectIndex(i)} />
-              <Input value={o} onChange={(e) => { const next = [...options]; next[i] = e.target.value; setOptions(next); }} placeholder={`Option ${i + 1}`} required />
-            </div>
-          ))}
-          <Textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} rows={2} placeholder="Explanation (optional)" />
-          <Button type="submit" className="text-sm">Add question</Button>
-        </form>
-      </Card>
-
-      {loading ? (
-        <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-brand-600" /></div>
-      ) : (
-        <div className="space-y-3">
-          {questions.map((q, i) => (
-            <Card key={q.id} className="p-4">
-              <div className="flex items-start justify-between">
-                <p className="font-medium text-slate-800">{i + 1}. {q.prompt}</p>
-                <button onClick={async () => { await deleteQuestion(q.id); refresh(); }} className="text-slate-300 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
-              </div>
-              <ul className="mt-2 space-y-1 text-sm">
-                {q.options.map((o, oi) => (
-                  <li key={oi} className={oi === q.correct_index ? 'font-semibold text-brand-700' : 'text-slate-500'}>
-                    {oi === q.correct_index && <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />}
-                    {o}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function QuizRunner({ quiz, onDone }: { quiz: Quiz; onDone: () => void }) {
-  const { profile } = useAuth();
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState<number[]>([]);
-  const [submitted, setSubmitted] = useState(false);
-  const [score, setScore] = useState(0);
-
-  useEffect(() => {
-    listQuestions(quiz.id).then((qs) => {
-      setQuestions(qs);
-      setAnswers(new Array(qs.length).fill(-1));
-      setLoading(false);
-    });
-  }, [quiz.id]);
-
-  async function handleSubmit() {
-    const s = questions.reduce((acc, q, i) => acc + (answers[i] === q.correct_index ? 1 : 0), 0);
-    setScore(s);
-    setSubmitted(true);
-    if (profile) {
-      await submitQuizAttempt({ quiz_id: quiz.id, student_id: profile.id, score: s, total: questions.length, answers });
-    }
-  }
-
-  if (loading) return <div className="flex justify-center py-10"><Spinner className="h-5 w-5 text-brand-600" /></div>;
-
-  if (questions.length === 0) {
-    return <EmptyState title="No questions yet" description="This quiz doesn't have any questions." action={<Button variant="secondary" onClick={onDone}>Back</Button>} />;
-  }
-
-  if (submitted) {
-    const pct = Math.round((score / questions.length) * 100);
-    return (
-      <Card className="p-8 text-center">
-        <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">Your result</p>
-        <p className="mt-2 text-5xl font-extrabold text-brand-600">{pct}%</p>
-        <p className="mt-1 text-slate-500">{score} out of {questions.length} correct</p>
-        <div className="mx-auto mt-6 max-w-lg space-y-3 text-left">
-          {questions.map((q, i) => (
-            <div key={q.id} className="rounded-xl border border-slate-100 p-3">
-              <p className="text-sm font-medium text-slate-800">{i + 1}. {q.prompt}</p>
-              <p className={`mt-1 text-sm ${answers[i] === q.correct_index ? 'text-brand-600' : 'text-red-600'}`}>
-                Your answer: {answers[i] >= 0 ? q.options[answers[i]] : '—'}
-              </p>
-              {answers[i] !== q.correct_index && <p className="text-sm text-slate-500">Correct: {q.options[q.correct_index]}</p>}
-              {q.explanation && <p className="mt-1 text-xs text-slate-400">{q.explanation}</p>}
-            </div>
-          ))}
-        </div>
-        <Button className="mt-6" onClick={onDone}>Done</Button>
-      </Card>
-    );
-  }
-
-  const q = questions[current];
-  return (
-    <Card className="p-6">
-      <div className="mb-4 flex items-center justify-between text-sm text-slate-500">
-        <span>Question {current + 1} of {questions.length}</span>
-        <span>{quiz.duration_minutes} min</span>
-      </div>
-      <p className="text-lg font-semibold text-slate-900">{q.prompt}</p>
-      <div className="mt-4 space-y-2">
-        {q.options.map((o, i) => (
-          <button
-            key={i}
-            onClick={() => { const next = [...answers]; next[current] = i; setAnswers(next); }}
-            className={`w-full rounded-xl border px-4 py-3 text-left text-sm font-medium transition ${
-              answers[current] === i ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            {o}
-          </button>
-        ))}
-      </div>
-      <div className="mt-6 flex justify-between">
-        <Button variant="ghost" disabled={current === 0} onClick={() => setCurrent((c) => c - 1)}>Previous</Button>
-        {current < questions.length - 1 ? (
-          <Button onClick={() => setCurrent((c) => c + 1)}>Next</Button>
-        ) : (
-          <Button onClick={handleSubmit}>Submit</Button>
-        )}
-      </div>
-    </Card>
-  );
-}
