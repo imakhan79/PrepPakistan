@@ -13,10 +13,10 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
 
 const DEMO_PASSWORD = 'Demo1234!';
 const DEMO_ACCOUNTS: { role: Role; label: string; email: string; fullName: string; instituteName?: string }[] = [
-  { role: 'student', label: 'Student', email: 'student@demo.test', fullName: 'Demo Student' },
-  { role: 'parent', label: 'Parent', email: 'parent@demo.test', fullName: 'Demo Parent' },
-  { role: 'teacher', label: 'Teacher', email: 'teacher@demo.test', fullName: 'Demo Teacher' },
-  { role: 'institute_admin', label: 'Institute', email: 'institute@demo.test', fullName: 'Demo Institute Admin', instituteName: 'Demo Academy' },
+  { role: 'student', label: 'Student', email: 'preppakistan.demo.student@example.com', fullName: 'Demo Student' },
+  { role: 'parent', label: 'Parent', email: 'preppakistan.demo.parent@example.com', fullName: 'Demo Parent' },
+  { role: 'teacher', label: 'Teacher', email: 'preppakistan.demo.teacher@example.com', fullName: 'Demo Teacher' },
+  { role: 'institute_admin', label: 'Institute', email: 'preppakistan.demo.institute@example.com', fullName: 'Demo Institute Admin', instituteName: 'Demo Academy' },
 ];
 
 export default function AuthPage({ onBack }: { onBack?: () => void }) {
