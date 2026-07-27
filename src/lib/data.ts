@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Subject, Note, Lecture, Flashcard, Quiz, Question, QuizAttempt, ProgressSummary, ExamCategory, LeaderboardRow, Institute, Profile } from './types';
+import type { Subject, Note, Lecture, Flashcard, Quiz, Question, QuizAttempt, ProgressSummary, ExamCategory, LeaderboardRow, Institute, Profile, ChildRequest, IncomingLinkRequest } from './types';
 
 export async function getLeaderboard(): Promise<LeaderboardRow[]> {
   const { data, error } = await supabase.rpc('leaderboard');
@@ -13,7 +13,7 @@ export async function createInstitute(input: { name: string; created_by: string 
   return data as Institute;
 }
 
-export async function linkChildByEmail(parentId: string, email: string) {
+export async function requestChildLink(parentId: string, email: string) {
   const { data: student, error: lookupError } = await supabase
     .from('profiles')
     .select('*')
@@ -22,18 +22,37 @@ export async function linkChildByEmail(parentId: string, email: string) {
     .maybeSingle();
   if (lookupError) throw lookupError;
   if (!student) throw new Error('No student account found with that email.');
-  const { error } = await supabase.from('parent_links').insert({ parent_id: parentId, student_id: student.id });
+  const { error } = await supabase
+    .from('parent_links')
+    .upsert({ parent_id: parentId, student_id: student.id, status: 'pending' }, { onConflict: 'parent_id,student_id' });
   if (error) throw error;
   return student as Profile;
 }
 
-export async function listMyChildren(parentId: string): Promise<Profile[]> {
+export async function listMyChildRequests(parentId: string): Promise<ChildRequest[]> {
   const { data, error } = await supabase
     .from('parent_links')
-    .select('student:profiles!parent_links_student_id_fkey(*)')
-    .eq('parent_id', parentId);
+    .select('id, status, student:profiles!parent_links_student_id_fkey(*)')
+    .eq('parent_id', parentId)
+    .order('created_at', { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((row: any) => row.student) as Profile[];
+  return (data ?? []).map((row: any) => ({ linkId: row.id, status: row.status, student: row.student })) as ChildRequest[];
+}
+
+export async function listPendingLinkRequests(studentId: string): Promise<IncomingLinkRequest[]> {
+  const { data, error } = await supabase
+    .from('parent_links')
+    .select('id, created_at, parent:profiles!parent_links_parent_id_fkey(*)')
+    .eq('student_id', studentId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row: any) => ({ linkId: row.id, parent: row.parent, created_at: row.created_at })) as IncomingLinkRequest[];
+}
+
+export async function respondToLinkRequest(linkId: string, approve: boolean) {
+  const { error } = await supabase.from('parent_links').update({ status: approve ? 'approved' : 'rejected' }).eq('id', linkId);
+  if (error) throw error;
 }
 
 export async function listStudentRoster(instituteId: string | null): Promise<Profile[]> {

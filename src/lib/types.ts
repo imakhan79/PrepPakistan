@@ -22,10 +22,25 @@ export interface Institute {
   created_at: string;
 }
 
+export type LinkStatus = 'pending' | 'approved' | 'rejected';
+
 export interface ParentLink {
   id: string;
   parent_id: string;
   student_id: string;
+  status: LinkStatus;
+  created_at: string;
+}
+
+export interface ChildRequest {
+  linkId: string;
+  status: LinkStatus;
+  student: Profile;
+}
+
+export interface IncomingLinkRequest {
+  linkId: string;
+  parent: Profile;
   created_at: string;
 }
 

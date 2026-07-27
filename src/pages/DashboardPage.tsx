@@ -1,35 +1,50 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, Trophy, TrendingUp, Users as UsersIcon, ArrowRight, Baby } from 'lucide-react';
+import { BookOpen, Trophy, TrendingUp, Users as UsersIcon, ArrowRight, Baby, UserCheck, Check, X } from 'lucide-react';
 import { useAuth } from '../lib/auth';
-import { listSubjects, listAttemptsForStudent, getProgressSummary, listMyChildren } from '../lib/data';
-import { Card, PageHeader, Spinner } from '../components/ui';
+import {
+  listSubjects, listAttemptsForStudent, getProgressSummary,
+  listMyChildRequests, listPendingLinkRequests, respondToLinkRequest,
+} from '../lib/data';
+import { Card, PageHeader, Spinner, Badge, Button } from '../components/ui';
 import type { View } from '../components/Shell';
 import { isStaffRole } from '../lib/types';
-import type { Subject, ProgressSummary, Profile } from '../lib/types';
+import type { Subject, ProgressSummary, ChildRequest, IncomingLinkRequest } from '../lib/types';
 
 export default function DashboardPage({ onNavigate }: { onNavigate: (v: View) => void }) {
   const { profile } = useAuth();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [progress, setProgress] = useState<ProgressSummary[]>([]);
   const [attemptCount, setAttemptCount] = useState(0);
-  const [children, setChildren] = useState<Profile[]>([]);
+  const [childRequests, setChildRequests] = useState<ChildRequest[]>([]);
+  const [incomingRequests, setIncomingRequests] = useState<IncomingLinkRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  async function refresh() {
     if (!profile) return;
-    (async () => {
-      const subs = await listSubjects();
-      setSubjects(subs);
-      if (profile.role === 'student') {
-        const [attempts, prog] = await Promise.all([listAttemptsForStudent(profile.id), getProgressSummary(profile.id)]);
-        setAttemptCount(attempts.length);
-        setProgress(prog);
-      } else if (profile.role === 'parent') {
-        setChildren(await listMyChildren(profile.id));
-      }
-      setLoading(false);
-    })();
+    const subs = await listSubjects();
+    setSubjects(subs);
+    if (profile.role === 'student') {
+      const [attempts, prog, incoming] = await Promise.all([
+        listAttemptsForStudent(profile.id),
+        getProgressSummary(profile.id),
+        listPendingLinkRequests(profile.id),
+      ]);
+      setAttemptCount(attempts.length);
+      setProgress(prog);
+      setIncomingRequests(incoming);
+    } else if (profile.role === 'parent') {
+      setChildRequests(await listMyChildRequests(profile.id));
+    }
+  }
+
+  useEffect(() => {
+    refresh().finally(() => setLoading(false));
   }, [profile?.id]);
+
+  async function handleRespond(linkId: string, approve: boolean) {
+    await respondToLinkRequest(linkId, approve);
+    setIncomingRequests((prev) => prev.filter((r) => r.linkId !== linkId));
+  }
 
   if (loading) {
     return (
@@ -38,6 +53,8 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (v: View) =>
       </div>
     );
   }
+
+  const approvedChildren = childRequests.filter((c) => c.status === 'approved');
 
   const overallAverage = progress.length
     ? Math.round(progress.reduce((a, b) => a + b.average_score, 0) / progress.filter((p) => p.attempts > 0).length || 0)
@@ -50,7 +67,7 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (v: View) =>
       ]
     : profile?.role === 'parent'
     ? [
-        { label: 'Linked children', value: children.length, icon: <Baby className="h-5 w-5" />, view: 'children' as View },
+        { label: 'Linked children', value: approvedChildren.length, icon: <Baby className="h-5 w-5" />, view: 'children' as View },
       ]
     : [
         { label: 'Subjects available', value: subjects.length, icon: <BookOpen className="h-5 w-5" />, view: 'subjects' as View },
@@ -67,6 +84,32 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (v: View) =>
   return (
     <div>
       <PageHeader title={`Welcome back, ${profile?.full_name?.split(' ')[0] ?? ''}`} description={description} />
+
+      {incomingRequests.length > 0 && (
+        <div className="mb-8">
+          <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-slate-900">
+            <UserCheck className="h-5 w-5 text-accent-600" /> Parent link requests
+          </h2>
+          <div className="space-y-3">
+            {incomingRequests.map((r) => (
+              <Card key={r.linkId} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                <div>
+                  <p className="font-semibold text-slate-800">{r.parent.full_name}</p>
+                  <p className="text-sm text-slate-500">{r.parent.email} wants to link as your parent and view your progress.</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => handleRespond(r.linkId, false)} className="text-sm">
+                    <X className="h-4 w-4" /> Decline
+                  </Button>
+                  <Button onClick={() => handleRespond(r.linkId, true)} className="text-sm">
+                    <Check className="h-4 w-4" /> Approve
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map((s) => (
@@ -92,14 +135,21 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (v: View) =>
               Manage <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
-          {children.length === 0 ? (
-            <Card className="p-5 text-sm text-slate-500">No children linked yet. Go to "Manage" to link one by email.</Card>
+          {childRequests.length === 0 ? (
+            <Card className="p-5 text-sm text-slate-500">No children linked yet. Go to "Manage" to send a link request by email.</Card>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {children.map((c) => (
-                <Card key={c.id} className="p-5">
-                  <p className="font-bold text-slate-900">{c.full_name}</p>
-                  <p className="text-sm text-slate-500">{c.email}</p>
+              {childRequests.map((c) => (
+                <Card key={c.linkId} className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-bold text-slate-900">{c.student.full_name}</p>
+                      <p className="text-sm text-slate-500">{c.student.email}</p>
+                    </div>
+                    {c.status !== 'approved' && (
+                      <Badge tone={c.status === 'pending' ? 'accent' : 'red'}>{c.status === 'pending' ? 'Awaiting approval' : 'Declined'}</Badge>
+                    )}
+                  </div>
                 </Card>
               ))}
             </div>
