@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Trash2, ArrowLeft, BookOpen, Video, Layers, ClipboardList, X, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import {
-  listSubjects, createSubject, deleteSubject,
+  listSubjects, createSubject, deleteSubject, listExamCategories,
   listNotes, createNote, deleteNote,
   listLectures, createLecture, deleteLecture,
   listFlashcards, createFlashcard, deleteFlashcard,
@@ -11,7 +11,7 @@ import {
   submitQuizAttempt,
 } from '../lib/data';
 import { Button, Card, Input, Textarea, Badge, EmptyState, Spinner, PageHeader } from '../components/ui';
-import type { Subject, Note, Lecture, Flashcard, Quiz, Question } from '../lib/types';
+import type { Subject, Note, Lecture, Flashcard, Quiz, Question, ExamCategory } from '../lib/types';
 
 const ICONS = ['📘', '🧮', '🧪', '🌍', '💻', '📖', '🔬', '📐'];
 const COLORS = ['#18b077', '#6a47f8', '#f59e0b', '#ef4444', '#0ea5e9', '#ec4899'];
@@ -19,6 +19,8 @@ const COLORS = ['#18b077', '#6a47f8', '#f59e0b', '#ef4444', '#0ea5e9', '#ec4899'
 export default function SubjectsPage() {
   const { profile } = useAuth();
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [categories, setCategories] = useState<ExamCategory[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Subject | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -28,7 +30,7 @@ export default function SubjectsPage() {
   }
 
   useEffect(() => {
-    refresh().finally(() => setLoading(false));
+    Promise.all([refresh(), listExamCategories().then(setCategories)]).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="flex justify-center py-16"><Spinner className="h-6 w-6 text-brand-600" /></div>;
@@ -37,11 +39,14 @@ export default function SubjectsPage() {
     return <SubjectDetail subject={selected} onBack={() => setSelected(null)} />;
   }
 
+  const filtered = activeCategory === 'all' ? subjects : subjects.filter((s) => s.category_id === activeCategory);
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
+
   return (
     <div>
       <PageHeader
         title="Subjects"
-        description="Browse notes, lectures, flashcards, and quizzes."
+        description="Your prep track for academic, admission, government, military, professional, and recruitment exams."
         action={profile?.role === 'admin' && (
           <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> New subject</Button>
         )}
@@ -49,22 +54,49 @@ export default function SubjectsPage() {
 
       {showCreate && (
         <CreateSubjectModal
+          categories={categories}
           onClose={() => setShowCreate(false)}
           onCreated={async () => { await refresh(); setShowCreate(false); }}
         />
       )}
 
-      {subjects.length === 0 ? (
+      <div className="mb-6 flex flex-wrap gap-2">
+        <button
+          onClick={() => setActiveCategory('all')}
+          className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+            activeCategory === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          All tracks
+        </button>
+        {categories.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => setActiveCategory(c.id)}
+            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+              activeCategory === c.id ? 'text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+            style={activeCategory === c.id ? { backgroundColor: c.color ?? '#18b077' } : undefined}
+          >
+            <span>{c.icon}</span> {c.title}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
         <EmptyState icon={<BookOpen className="h-10 w-10" />} title="No subjects yet" description={profile?.role === 'admin' ? 'Create your first subject to get started.' : 'Check back soon.'} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {subjects.map((s) => (
+          {filtered.map((s) => (
             <Card key={s.id} className="group relative cursor-pointer p-5 transition hover:-translate-y-0.5 hover:shadow-lg" onClick={() => setSelected(s)}>
               <div className="flex h-11 w-11 items-center justify-center rounded-xl text-xl" style={{ backgroundColor: (s.color ?? '#18b077') + '20' }}>
                 {s.icon ?? '📘'}
               </div>
               <h3 className="mt-3 font-bold text-slate-900">{s.title}</h3>
               <p className="mt-1 line-clamp-2 text-sm text-slate-500">{s.description}</p>
+              {s.category_id && categoryById.get(s.category_id) && (
+                <div className="mt-2"><Badge tone="slate">{categoryById.get(s.category_id)!.title}</Badge></div>
+              )}
               {profile?.role === 'admin' && (
                 <button
                   onClick={async (e) => { e.stopPropagation(); await deleteSubject(s.id); refresh(); }}
@@ -81,19 +113,20 @@ export default function SubjectsPage() {
   );
 }
 
-function CreateSubjectModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function CreateSubjectModal({ categories, onClose, onCreated }: { categories: ExamCategory[]; onClose: () => void; onCreated: () => void }) {
   const { profile } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState(ICONS[0]);
   const [color, setColor] = useState(COLORS[0]);
+  const [categoryId, setCategoryId] = useState<string>(categories[0]?.id ?? '');
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!profile) return;
     setSaving(true);
-    await createSubject({ title, description, icon, color, created_by: profile.id });
+    await createSubject({ title, description, icon, color, category_id: categoryId || null, created_by: profile.id });
     setSaving(false);
     onCreated();
   }
@@ -101,6 +134,14 @@ function CreateSubjectModal({ onClose, onCreated }: { onClose: () => void; onCre
   return (
     <Modal onClose={onClose} title="New subject">
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-slate-700">Exam track</label>
+          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm">
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.icon} {c.title}</option>
+            ))}
+          </select>
+        </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">Title</label>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Mathematics" />

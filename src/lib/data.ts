@@ -1,5 +1,11 @@
 import { supabase } from './supabase';
-import type { Subject, Note, Lecture, Flashcard, Quiz, Question, QuizAttempt, ProgressSummary } from './types';
+import type { Subject, Note, Lecture, Flashcard, Quiz, Question, QuizAttempt, ProgressSummary, ExamCategory } from './types';
+
+export async function listExamCategories(): Promise<ExamCategory[]> {
+  const { data, error } = await supabase.from('exam_categories').select('*').order('order_index', { ascending: true });
+  if (error) throw error;
+  return data as ExamCategory[];
+}
 
 export async function listSubjects(): Promise<Subject[]> {
   const { data, error } = await supabase.from('subjects').select('*').order('created_at', { ascending: false });
@@ -7,7 +13,7 @@ export async function listSubjects(): Promise<Subject[]> {
   return data as Subject[];
 }
 
-export async function createSubject(input: { title: string; description: string; icon: string; color: string; created_by: string }) {
+export async function createSubject(input: { title: string; description: string; icon: string; color: string; category_id: string | null; created_by: string }) {
   const { data, error } = await supabase.from('subjects').insert(input).select().single();
   if (error) throw error;
   return data as Subject;

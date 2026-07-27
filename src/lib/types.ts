@@ -10,12 +10,23 @@ export interface Profile {
   created_at: string;
 }
 
+export interface ExamCategory {
+  id: string;
+  key: string;
+  title: string;
+  description: string | null;
+  icon: string | null;
+  color: string | null;
+  order_index: number;
+}
+
 export interface Subject {
   id: string;
   title: string;
   description: string | null;
   icon: string | null;
   color: string | null;
+  category_id: string | null;
   created_by: string;
   created_at: string;
 }
