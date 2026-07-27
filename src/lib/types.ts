@@ -1,4 +1,8 @@
-export type Role = 'admin' | 'student';
+export type Role = 'admin' | 'teacher' | 'parent' | 'student' | 'institute_admin';
+
+export function isStaffRole(role?: Role | null): boolean {
+  return role === 'admin' || role === 'teacher' || role === 'institute_admin';
+}
 
 export interface Profile {
   id: string;
@@ -7,6 +11,21 @@ export interface Profile {
   role: Role;
   avatar_url: string | null;
   grade_level: string | null;
+  institute_id: string | null;
+  created_at: string;
+}
+
+export interface Institute {
+  id: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface ParentLink {
+  id: string;
+  parent_id: string;
+  student_id: string;
   created_at: string;
 }
 
@@ -27,6 +46,7 @@ export interface Subject {
   icon: string | null;
   color: string | null;
   category_id: string | null;
+  institute_id: string | null;
   created_by: string;
   created_at: string;
 }

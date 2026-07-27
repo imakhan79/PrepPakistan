@@ -4,6 +4,13 @@ import { useAuth } from '../lib/auth';
 import { Button, Input } from '../components/ui';
 import type { Role } from '../lib/types';
 
+const ROLE_OPTIONS: { value: Role; label: string }[] = [
+  { value: 'student', label: 'Student' },
+  { value: 'parent', label: 'Parent' },
+  { value: 'teacher', label: 'Teacher' },
+  { value: 'institute_admin', label: 'Institute' },
+];
+
 export default function AuthPage({ onBack }: { onBack?: () => void }) {
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -11,6 +18,7 @@ export default function AuthPage({ onBack }: { onBack?: () => void }) {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<Role>('student');
+  const [instituteName, setInstituteName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -18,7 +26,7 @@ export default function AuthPage({ onBack }: { onBack?: () => void }) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const result = mode === 'signin' ? await signIn(email, password) : await signUp(email, password, fullName, role);
+    const result = mode === 'signin' ? await signIn(email, password) : await signUp(email, password, fullName, role, instituteName);
     setLoading(false);
     if (result.error) setError(result.error);
   }
@@ -58,20 +66,31 @@ export default function AuthPage({ onBack }: { onBack?: () => void }) {
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">I am a</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(['student', 'admin'] as Role[]).map((r) => (
+                  {ROLE_OPTIONS.map((opt) => (
                     <button
                       type="button"
-                      key={r}
-                      onClick={() => setRole(r)}
-                      className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${
-                        role === r ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                      key={opt.value}
+                      onClick={() => setRole(opt.value)}
+                      className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                        role === opt.value ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                       }`}
                     >
-                      {r}
+                      {opt.label}
                     </button>
                   ))}
                 </div>
               </div>
+            )}
+            {mode === 'signup' && role === 'institute_admin' && (
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">Institute name</label>
+                <Input value={instituteName} onChange={(e) => setInstituteName(e.target.value)} required placeholder="Bright Future Academy" />
+              </div>
+            )}
+            {mode === 'signup' && role === 'parent' && (
+              <p className="rounded-lg bg-accent-50 px-3 py-2 text-xs text-accent-700">
+                After signing up, you'll be able to link your child's account from your dashboard using their email.
+              </p>
             )}
 
             {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

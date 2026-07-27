@@ -7,6 +7,8 @@ import SubjectsPage from './pages/SubjectsPage';
 import ProgressPage from './pages/ProgressPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import UsersPage from './pages/UsersPage';
+import MyChildrenPage from './pages/MyChildrenPage';
+import RosterPage from './pages/RosterPage';
 import Shell, { View } from './components/Shell';
 import { Spinner } from './components/ui';
 
@@ -33,6 +35,8 @@ function AppInner() {
       {active === 'subjects' && <SubjectsPage />}
       {active === 'progress' && <ProgressPage />}
       {active === 'leaderboard' && <LeaderboardPage />}
+      {active === 'children' && <MyChildrenPage />}
+      {active === 'roster' && <RosterPage />}
       {active === 'users' && <UsersPage />}
     </Shell>
   );

@@ -12,6 +12,7 @@ import {
 } from '../lib/data';
 import { Button, Card, Input, Textarea, Badge, EmptyState, Spinner, PageHeader } from '../components/ui';
 import type { Subject, Note, Lecture, Flashcard, Quiz, Question, ExamCategory } from '../lib/types';
+import { isStaffRole } from '../lib/types';
 
 const ICONS = ['📘', '🧮', '🧪', '🌍', '💻', '📖', '🔬', '📐'];
 const COLORS = ['#18b077', '#6a47f8', '#f59e0b', '#ef4444', '#0ea5e9', '#ec4899'];
@@ -47,7 +48,7 @@ export default function SubjectsPage() {
       <PageHeader
         title="Subjects"
         description="Your prep track for academic, admission, government, military, professional, and recruitment exams."
-        action={profile?.role === 'admin' && (
+        action={isStaffRole(profile?.role) && (
           <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> New subject</Button>
         )}
       />
@@ -84,7 +85,7 @@ export default function SubjectsPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon={<BookOpen className="h-10 w-10" />} title="No subjects yet" description={profile?.role === 'admin' ? 'Create your first subject to get started.' : 'Check back soon.'} />
+        <EmptyState icon={<BookOpen className="h-10 w-10" />} title="No subjects yet" description={isStaffRole(profile?.role) ? 'Create your first subject to get started.' : 'Check back soon.'} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((s) => (
@@ -97,7 +98,7 @@ export default function SubjectsPage() {
               {s.category_id && categoryById.get(s.category_id) && (
                 <div className="mt-2"><Badge tone="slate">{categoryById.get(s.category_id)!.title}</Badge></div>
               )}
-              {profile?.role === 'admin' && (
+              {isStaffRole(profile?.role) && (
                 <button
                   onClick={async (e) => { e.stopPropagation(); await deleteSubject(s.id); refresh(); }}
                   className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-300 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
@@ -126,7 +127,7 @@ function CreateSubjectModal({ categories, onClose, onCreated }: { categories: Ex
     e.preventDefault();
     if (!profile) return;
     setSaving(true);
-    await createSubject({ title, description, icon, color, category_id: categoryId || null, created_by: profile.id });
+    await createSubject({ title, description, icon, color, category_id: categoryId || null, institute_id: profile.institute_id, created_by: profile.id });
     setSaving(false);
     onCreated();
   }
@@ -253,7 +254,7 @@ function NotesTab({ subject }: { subject: Subject }) {
 
   return (
     <div className="space-y-4">
-      {profile?.role === 'admin' && (
+      {isStaffRole(profile?.role) && (
         <Card className="p-5">
           {!showForm ? (
             <button onClick={() => setShowForm(true)} className="flex items-center gap-2 text-sm font-semibold text-brand-600">
@@ -278,7 +279,7 @@ function NotesTab({ subject }: { subject: Subject }) {
           <Card key={n.id} className="p-5">
             <div className="flex items-start justify-between">
               <button className="text-left font-bold text-slate-900" onClick={() => setOpen(open === n.id ? null : n.id)}>{n.title}</button>
-              {profile?.role === 'admin' && (
+              {isStaffRole(profile?.role) && (
                 <button onClick={async () => { await deleteNote(n.id); refresh(); }} className="text-slate-300 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
               )}
             </div>
@@ -317,7 +318,7 @@ function LecturesTab({ subject }: { subject: Subject }) {
 
   return (
     <div className="space-y-4">
-      {profile?.role === 'admin' && (
+      {isStaffRole(profile?.role) && (
         <Card className="p-5">
           {!showForm ? (
             <button onClick={() => setShowForm(true)} className="flex items-center gap-2 text-sm font-semibold text-brand-600">
@@ -349,7 +350,7 @@ function LecturesTab({ subject }: { subject: Subject }) {
               <div className="p-4">
                 <div className="flex items-start justify-between">
                   <h3 className="font-bold text-slate-900">{l.title}</h3>
-                  {profile?.role === 'admin' && (
+                  {isStaffRole(profile?.role) && (
                     <button onClick={async () => { await deleteLecture(l.id); refresh(); }} className="text-slate-300 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                   )}
                 </div>
@@ -390,7 +391,7 @@ function FlashcardsTab({ subject }: { subject: Subject }) {
 
   return (
     <div className="space-y-4">
-      {profile?.role === 'admin' && (
+      {isStaffRole(profile?.role) && (
         <Card className="p-5">
           {!showForm ? (
             <button onClick={() => setShowForm(true)} className="flex items-center gap-2 text-sm font-semibold text-brand-600">
@@ -417,7 +418,7 @@ function FlashcardsTab({ subject }: { subject: Subject }) {
               <Card className="flex min-h-[140px] items-center justify-center p-5 text-center transition hover:shadow-lg">
                 <p className="text-sm font-medium text-slate-800">{flipped[c.id] ? c.back : c.front}</p>
               </Card>
-              {profile?.role === 'admin' && (
+              {isStaffRole(profile?.role) && (
                 <button
                   onClick={async (e) => { e.stopPropagation(); await deleteFlashcard(c.id); refresh(); }}
                   className="absolute right-2 top-2 rounded-lg bg-white p-1.5 text-slate-300 opacity-0 shadow-sm hover:text-red-600 group-hover:opacity-100"
@@ -464,7 +465,7 @@ function QuizzesTab({ subject }: { subject: Subject }) {
 
   return (
     <div className="space-y-4">
-      {profile?.role === 'admin' && (
+      {isStaffRole(profile?.role) && (
         <Card className="p-5">
           {!showForm ? (
             <button onClick={() => setShowForm(true)} className="flex items-center gap-2 text-sm font-semibold text-brand-600">
@@ -500,12 +501,12 @@ function QuizzesTab({ subject }: { subject: Subject }) {
                   <h3 className="mt-2 font-bold text-slate-900">{q.title}</h3>
                   <p className="mt-1 text-sm text-slate-500">{q.duration_minutes} minutes</p>
                 </div>
-                {profile?.role === 'admin' && (
+                {isStaffRole(profile?.role) && (
                   <button onClick={async () => { await deleteQuiz(q.id); refresh(); }} className="text-slate-300 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                 )}
               </div>
               <div className="mt-4 flex gap-2">
-                {profile?.role === 'admin' ? (
+                {isStaffRole(profile?.role) ? (
                   <Button variant="secondary" onClick={() => setEditing(q)} className="text-sm">Manage questions</Button>
                 ) : (
                   <Button onClick={() => setTaking(q)} className="text-sm">Start</Button>

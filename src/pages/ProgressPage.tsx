@@ -27,20 +27,19 @@ function computeAchievements(attempts: QuizAttempt[], progress: ProgressSummary[
   ];
 }
 
-export default function ProgressPage() {
-  const { profile } = useAuth();
+export function StudentProgress({ studentId }: { studentId: string }) {
   const [rows, setRows] = useState<ProgressSummary[]>([]);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!profile) return;
-    Promise.all([getProgressSummary(profile.id), listAttemptsForStudent(profile.id)]).then(([prog, atts]) => {
+    setLoading(true);
+    Promise.all([getProgressSummary(studentId), listAttemptsForStudent(studentId)]).then(([prog, atts]) => {
       setRows(prog);
       setAttempts(atts);
       setLoading(false);
     });
-  }, [profile?.id]);
+  }, [studentId]);
 
   if (loading) {
     return <div className="flex justify-center py-16"><Spinner className="h-6 w-6 text-brand-600" /></div>;
@@ -51,8 +50,6 @@ export default function ProgressPage() {
 
   return (
     <div>
-      <PageHeader title="Your progress" description="Track how you're doing across every subject." />
-
       <div className="mb-8">
         <h2 className="mb-3 text-lg font-bold text-slate-900">Achievements</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -74,7 +71,7 @@ export default function ProgressPage() {
 
       <h2 className="mb-3 text-lg font-bold text-slate-900">By subject</h2>
       {attempted.length === 0 ? (
-        <EmptyState icon={<TrendingUp className="h-10 w-10" />} title="No attempts yet" description="Take a quiz or mock exam to start tracking your progress." />
+        <EmptyState icon={<TrendingUp className="h-10 w-10" />} title="No attempts yet" description="Take a quiz or mock exam to start tracking progress." />
       ) : (
         <div className="space-y-3">
           {attempted.map((r) => (
@@ -93,6 +90,17 @@ export default function ProgressPage() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+export default function ProgressPage() {
+  const { profile } = useAuth();
+  if (!profile) return null;
+  return (
+    <div>
+      <PageHeader title="Your progress" description="Track how you're doing across every subject." />
+      <StudentProgress studentId={profile.id} />
     </div>
   );
 }

@@ -1,11 +1,11 @@
 import { ReactNode, useState } from 'react';
 import {
-  LayoutDashboard, BookOpen, Users, TrendingUp, Trophy, LogOut, Menu, X, GraduationCap,
+  LayoutDashboard, BookOpen, Users, TrendingUp, Trophy, Baby, LogOut, Menu, X, GraduationCap,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import type { Role } from '../lib/types';
 
-export type View = 'dashboard' | 'subjects' | 'progress' | 'leaderboard' | 'users';
+export type View = 'dashboard' | 'subjects' | 'progress' | 'leaderboard' | 'users' | 'children' | 'roster';
 
 interface NavItem {
   key: View;
@@ -15,10 +15,12 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" />, roles: ['admin', 'student'] },
-  { key: 'subjects', label: 'Subjects', icon: <BookOpen className="h-5 w-5" />, roles: ['admin', 'student'] },
+  { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" />, roles: ['admin', 'teacher', 'institute_admin', 'parent', 'student'] },
+  { key: 'subjects', label: 'Subjects', icon: <BookOpen className="h-5 w-5" />, roles: ['admin', 'teacher', 'institute_admin', 'student'] },
   { key: 'progress', label: 'Progress', icon: <TrendingUp className="h-5 w-5" />, roles: ['student'] },
-  { key: 'leaderboard', label: 'Leaderboard', icon: <Trophy className="h-5 w-5" />, roles: ['admin', 'student'] },
+  { key: 'leaderboard', label: 'Leaderboard', icon: <Trophy className="h-5 w-5" />, roles: ['admin', 'teacher', 'institute_admin', 'student'] },
+  { key: 'children', label: 'My Children', icon: <Baby className="h-5 w-5" />, roles: ['parent'] },
+  { key: 'roster', label: 'Students', icon: <Users className="h-5 w-5" />, roles: ['teacher', 'institute_admin'] },
   { key: 'users', label: 'Users', icon: <Users className="h-5 w-5" />, roles: ['admin'] },
 ];
 
@@ -60,7 +62,7 @@ export default function Shell({ active, onNavigate, children }: { active: View; 
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-800">{profile?.full_name}</p>
-            <p className="truncate text-xs capitalize text-slate-400">{profile?.role}</p>
+            <p className="truncate text-xs capitalize text-slate-400">{profile?.role?.replace('_', ' ')}</p>
           </div>
         </div>
         <button

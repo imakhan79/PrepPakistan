@@ -1,10 +1,47 @@
 import { supabase } from './supabase';
-import type { Subject, Note, Lecture, Flashcard, Quiz, Question, QuizAttempt, ProgressSummary, ExamCategory, LeaderboardRow } from './types';
+import type { Subject, Note, Lecture, Flashcard, Quiz, Question, QuizAttempt, ProgressSummary, ExamCategory, LeaderboardRow, Institute, Profile } from './types';
 
 export async function getLeaderboard(): Promise<LeaderboardRow[]> {
   const { data, error } = await supabase.rpc('leaderboard');
   if (error) throw error;
   return data as LeaderboardRow[];
+}
+
+export async function createInstitute(input: { name: string; created_by: string }) {
+  const { data, error } = await supabase.from('institutes').insert(input).select().single();
+  if (error) throw error;
+  return data as Institute;
+}
+
+export async function linkChildByEmail(parentId: string, email: string) {
+  const { data: student, error: lookupError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('email', email)
+    .eq('role', 'student')
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+  if (!student) throw new Error('No student account found with that email.');
+  const { error } = await supabase.from('parent_links').insert({ parent_id: parentId, student_id: student.id });
+  if (error) throw error;
+  return student as Profile;
+}
+
+export async function listMyChildren(parentId: string): Promise<Profile[]> {
+  const { data, error } = await supabase
+    .from('parent_links')
+    .select('student:profiles!parent_links_student_id_fkey(*)')
+    .eq('parent_id', parentId);
+  if (error) throw error;
+  return (data ?? []).map((row: any) => row.student) as Profile[];
+}
+
+export async function listStudentRoster(instituteId: string | null): Promise<Profile[]> {
+  let query = supabase.from('profiles').select('*').eq('role', 'student').order('created_at', { ascending: false });
+  if (instituteId) query = query.eq('institute_id', instituteId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data as Profile[];
 }
 
 export async function listExamCategories(): Promise<ExamCategory[]> {
@@ -19,7 +56,7 @@ export async function listSubjects(): Promise<Subject[]> {
   return data as Subject[];
 }
 
-export async function createSubject(input: { title: string; description: string; icon: string; color: string; category_id: string | null; created_by: string }) {
+export async function createSubject(input: { title: string; description: string; icon: string; color: string; category_id: string | null; institute_id: string | null; created_by: string }) {
   const { data, error } = await supabase.from('subjects').insert(input).select().single();
   if (error) throw error;
   return data as Subject;

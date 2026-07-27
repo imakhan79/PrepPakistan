@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, Trophy, TrendingUp, Users as UsersIcon, ArrowRight } from 'lucide-react';
+import { BookOpen, Trophy, TrendingUp, Users as UsersIcon, ArrowRight, Baby } from 'lucide-react';
 import { useAuth } from '../lib/auth';
-import { listSubjects, listAttemptsForStudent, getProgressSummary } from '../lib/data';
+import { listSubjects, listAttemptsForStudent, getProgressSummary, listMyChildren } from '../lib/data';
 import { Card, PageHeader, Spinner } from '../components/ui';
 import type { View } from '../components/Shell';
-import type { Subject, ProgressSummary } from '../lib/types';
+import { isStaffRole } from '../lib/types';
+import type { Subject, ProgressSummary, Profile } from '../lib/types';
 
 export default function DashboardPage({ onNavigate }: { onNavigate: (v: View) => void }) {
   const { profile } = useAuth();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [progress, setProgress] = useState<ProgressSummary[]>([]);
   const [attemptCount, setAttemptCount] = useState(0);
+  const [children, setChildren] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,6 +24,8 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (v: View) =>
         const [attempts, prog] = await Promise.all([listAttemptsForStudent(profile.id), getProgressSummary(profile.id)]);
         setAttemptCount(attempts.length);
         setProgress(prog);
+      } else if (profile.role === 'parent') {
+        setChildren(await listMyChildren(profile.id));
       }
       setLoading(false);
     })();
@@ -39,10 +43,14 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (v: View) =>
     ? Math.round(progress.reduce((a, b) => a + b.average_score, 0) / progress.filter((p) => p.attempts > 0).length || 0)
     : 0;
 
-  const stats = profile?.role === 'admin'
+  const stats = isStaffRole(profile?.role)
     ? [
         { label: 'Subjects', value: subjects.length, icon: <BookOpen className="h-5 w-5" />, view: 'subjects' as View },
-        { label: 'Students & staff', value: '—', icon: <UsersIcon className="h-5 w-5" />, view: 'users' as View },
+        { label: profile?.role === 'admin' ? 'Users' : 'Students', value: '—', icon: <UsersIcon className="h-5 w-5" />, view: (profile?.role === 'admin' ? 'users' : 'roster') as View },
+      ]
+    : profile?.role === 'parent'
+    ? [
+        { label: 'Linked children', value: children.length, icon: <Baby className="h-5 w-5" />, view: 'children' as View },
       ]
     : [
         { label: 'Subjects available', value: subjects.length, icon: <BookOpen className="h-5 w-5" />, view: 'subjects' as View },
@@ -50,12 +58,15 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (v: View) =>
         { label: 'Average score', value: `${overallAverage || 0}%`, icon: <TrendingUp className="h-5 w-5" />, view: 'progress' as View },
       ];
 
+  const description = isStaffRole(profile?.role)
+    ? 'Manage your content and monitor learner activity.'
+    : profile?.role === 'parent'
+    ? "Keep an eye on your child's learning progress."
+    : "Here's where you left off — keep the momentum going.";
+
   return (
     <div>
-      <PageHeader
-        title={`Welcome back, ${profile?.full_name?.split(' ')[0] ?? ''}`}
-        description={profile?.role === 'admin' ? 'Manage your content and monitor learner activity.' : "Here's where you left off — keep the momentum going."}
-      />
+      <PageHeader title={`Welcome back, ${profile?.full_name?.split(' ')[0] ?? ''}`} description={description} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map((s) => (
@@ -73,25 +84,48 @@ export default function DashboardPage({ onNavigate }: { onNavigate: (v: View) =>
         ))}
       </div>
 
-      <div className="mt-8">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900">{profile?.role === 'admin' ? 'Your subjects' : 'Continue learning'}</h2>
-          <button onClick={() => onNavigate('subjects')} className="flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700">
-            View all <ArrowRight className="h-3.5 w-3.5" />
-          </button>
+      {profile?.role === 'parent' ? (
+        <div className="mt-8">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-900">Your children</h2>
+            <button onClick={() => onNavigate('children')} className="flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700">
+              Manage <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {children.length === 0 ? (
+            <Card className="p-5 text-sm text-slate-500">No children linked yet. Go to "Manage" to link one by email.</Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {children.map((c) => (
+                <Card key={c.id} className="p-5">
+                  <p className="font-bold text-slate-900">{c.full_name}</p>
+                  <p className="text-sm text-slate-500">{c.email}</p>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {subjects.slice(0, 6).map((s) => (
-            <Card key={s.id} className="cursor-pointer p-5 transition hover:-translate-y-0.5 hover:shadow-lg" onClick={() => onNavigate('subjects')}>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl text-lg" style={{ backgroundColor: (s.color ?? '#18b077') + '20' }}>
-                {s.icon ?? '📘'}
-              </div>
-              <h3 className="mt-3 font-bold text-slate-900">{s.title}</h3>
-              <p className="mt-1 line-clamp-2 text-sm text-slate-500">{s.description}</p>
-            </Card>
-          ))}
+      ) : (
+        <div className="mt-8">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-900">{isStaffRole(profile?.role) ? 'Your subjects' : 'Continue learning'}</h2>
+            <button onClick={() => onNavigate('subjects')} className="flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700">
+              View all <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {subjects.slice(0, 6).map((s) => (
+              <Card key={s.id} className="cursor-pointer p-5 transition hover:-translate-y-0.5 hover:shadow-lg" onClick={() => onNavigate('subjects')}>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl text-lg" style={{ backgroundColor: (s.color ?? '#18b077') + '20' }}>
+                  {s.icon ?? '📘'}
+                </div>
+                <h3 className="mt-3 font-bold text-slate-900">{s.title}</h3>
+                <p className="mt-1 line-clamp-2 text-sm text-slate-500">{s.description}</p>
+              </Card>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

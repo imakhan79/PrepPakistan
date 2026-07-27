@@ -7,7 +7,7 @@ interface AuthContextValue {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, role: Role) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, fullName: string, role: Role, instituteName?: string) => Promise<{ error: string | null }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  async function signUp(email: string, password: string, fullName: string, role: Role) {
+  async function signUp(email: string, password: string, fullName: string, role: Role, instituteName?: string) {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return { error: error.message };
     if (data.user) {
@@ -57,6 +57,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role,
       });
       if (profileError) return { error: profileError.message };
+
+      if (role === 'institute_admin' && instituteName) {
+        const { data: institute, error: instituteError } = await supabase
+          .from('institutes')
+          .insert({ name: instituteName, created_by: data.user.id })
+          .select()
+          .single();
+        if (instituteError) return { error: instituteError.message };
+        const { error: linkError } = await supabase.from('profiles').update({ institute_id: institute.id }).eq('id', data.user.id);
+        if (linkError) return { error: linkError.message };
+      }
+
       await loadProfile(data.user.id);
     }
     return { error: null };
