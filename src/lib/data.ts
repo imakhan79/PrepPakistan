@@ -7,6 +7,84 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
   return data as LeaderboardRow[];
 }
 
+export interface PlatformStats {
+  totalUsers: number;
+  byRole: Record<string, number>;
+  totalSubjects: number;
+  totalAttempts: number;
+}
+
+export async function getPlatformStats(): Promise<PlatformStats> {
+  const [{ count: totalUsers }, { data: roleRows }, { count: totalSubjects }, { count: totalAttempts }] = await Promise.all([
+    supabase.from('profiles').select('id', { count: 'exact', head: true }),
+    supabase.from('profiles').select('role'),
+    supabase.from('subjects').select('id', { count: 'exact', head: true }),
+    supabase.from('quiz_attempts').select('id', { count: 'exact', head: true }),
+  ]);
+  const byRole: Record<string, number> = {};
+  for (const row of (roleRows ?? []) as { role: string }[]) byRole[row.role] = (byRole[row.role] ?? 0) + 1;
+  return { totalUsers: totalUsers ?? 0, byRole, totalSubjects: totalSubjects ?? 0, totalAttempts: totalAttempts ?? 0 };
+}
+
+export interface ContentStats {
+  subjects: number;
+  notes: number;
+  lectures: number;
+  quizzes: number;
+}
+
+export async function getContentStats(creatorId: string): Promise<ContentStats> {
+  const [{ count: subjects }, { count: notes }, { count: lectures }, { count: quizzes }] = await Promise.all([
+    supabase.from('subjects').select('id', { count: 'exact', head: true }).eq('created_by', creatorId),
+    supabase.from('notes').select('id', { count: 'exact', head: true }).eq('created_by', creatorId),
+    supabase.from('lectures').select('id', { count: 'exact', head: true }).eq('created_by', creatorId),
+    supabase.from('quizzes').select('id', { count: 'exact', head: true }).eq('created_by', creatorId),
+  ]);
+  return { subjects: subjects ?? 0, notes: notes ?? 0, lectures: lectures ?? 0, quizzes: quizzes ?? 0 };
+}
+
+export interface PerformanceSummary {
+  totalAttempts: number;
+  avgPct: number;
+}
+
+export async function getQuizAuthorPerformance(creatorId: string): Promise<PerformanceSummary> {
+  const { data, error } = await supabase
+    .from('quiz_attempts')
+    .select('score, total, quizzes!inner(created_by)')
+    .eq('quizzes.created_by', creatorId);
+  if (error) throw error;
+  const rows = (data ?? []) as { score: number; total: number }[];
+  const totalAttempts = rows.length;
+  const avgPct = totalAttempts
+    ? Math.round(rows.reduce((acc, r) => acc + (r.total > 0 ? (r.score / r.total) * 100 : 0), 0) / totalAttempts)
+    : 0;
+  return { totalAttempts, avgPct };
+}
+
+export interface InstituteOverview {
+  institute: Institute;
+  studentCount: number;
+  subjectCount: number;
+  totalAttempts: number;
+  avgPct: number;
+}
+
+export async function getInstituteOverview(instituteId: string): Promise<InstituteOverview> {
+  const [{ data: institute }, { count: studentCount }, { count: subjectCount }, { data: attemptRows }] = await Promise.all([
+    supabase.from('institutes').select('*').eq('id', instituteId).single(),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('institute_id', instituteId).eq('role', 'student'),
+    supabase.from('subjects').select('id', { count: 'exact', head: true }).eq('institute_id', instituteId),
+    supabase.from('quiz_attempts').select('score, total, profiles!inner(institute_id)').eq('profiles.institute_id', instituteId),
+  ]);
+  const rows = (attemptRows ?? []) as { score: number; total: number }[];
+  const totalAttempts = rows.length;
+  const avgPct = totalAttempts
+    ? Math.round(rows.reduce((acc, r) => acc + (r.total > 0 ? (r.score / r.total) * 100 : 0), 0) / totalAttempts)
+    : 0;
+  return { institute: institute as Institute, studentCount: studentCount ?? 0, subjectCount: subjectCount ?? 0, totalAttempts, avgPct };
+}
+
 export async function createInstitute(input: { name: string; created_by: string }) {
   const { data, error } = await supabase.from('institutes').insert(input).select().single();
   if (error) throw error;
